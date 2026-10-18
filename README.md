@@ -14,28 +14,82 @@ Moletta（モレッタ）は、Codex と Claude Code で使う AI 開発ハー�
 
 macOS / Linux、Python 3.11 以上を使用します。特定のモデル、追加の Python パッケージ、外部 API、常駐サーバーは不要です。操作・調査・実装には、ホストが提供するツールと権限を使います。
 
-```sh
-git clone https://github.com/9uiLe/moletta.git
-cd moletta
-python3 scripts/install.py /absolute/path/to/project
-```
+### 初回導入
 
-既存プロジェクトの `.agents/skills/` と `.claude/skills/` に技能一式へのリンクを配置します。片方だけに導入する場合や、元の checkout から独立したコピーを置く場合は次のように指定します。
+常設する Moletta 用フォルダーに `main` を取得し、実際に開発するプロジェクトへ導入します。以下のパスは実際の保存先に置き換えてください。`python3` が 3.11 未満の場合は、3.11 以上の Python の実行名を使います。
 
 ```sh
-python3 scripts/install.py /absolute/path/to/project --host codex
-python3 scripts/install.py /absolute/path/to/another-project --host claude --mode copy
+python3 --version
+git clone --branch main https://github.com/9uiLe/moletta.git /absolute/path/to/moletta &&
+  python3 /absolute/path/to/moletta/scripts/install.py /absolute/path/to/app-worktree
 ```
 
-全対象を配置前に確認し、既存項目を上書きしません。同じ checkout へのリンク導入は再実行できます。コピー導入では既存のリンクやコピーがあれば停止します。更新・削除する際は導入した技能だけを確認して取り除いてください。リンク導入は元の checkout の場所を維持します。
+既定では、次の両方へ5技能すべてのリンクを配置します。技能同士が相対参照するため、入口の `moletta` だけをコピーせず、一式を導入してください。
+
+| ホスト | プロジェクト内の導入先 | 呼び出し |
+| --- | --- | --- |
+| Codex | `.agents/skills/` | `$moletta` |
+| Claude Code | `.claude/skills/` | `/moletta` |
+
+片方だけなら `--host codex` または `--host claude`、元の checkout から独立したコピーなら `--mode copy` を指定します。
+
+```sh
+python3 /absolute/path/to/moletta/scripts/install.py /absolute/path/to/app-worktree --host codex
+python3 /absolute/path/to/moletta/scripts/install.py /absolute/path/to/another-app-worktree --host claude --mode copy
+```
+
+全対象を配置前に確認し、既存項目を上書きしません。同じ checkout へのリンク導入は再実行できます。コピー導入では既存のリンクやコピーがあれば停止します。グローバル導入は提供していません。導入後は対象プロジェクトをホストで開き、新しいセッションから使い始められます。
+
+### worktree ごとの導入と記録
+
+別の worktree で作業する場合は、その worktree を導入先に指定します。未追跡のリンクは Git が新しい worktree へ複製しないため、両ホストの配置を揃えるには worktree ごとに導入してください。同じ常設の Moletta checkout を共有できます。
+
+```sh
+python3 /absolute/path/to/moletta/scripts/install.py /absolute/path/to/app-feature-worktree
+```
+
+リンクはPC固有の絶対パスを含みます。個人用のリンクは、案件の方針に従い導入した項目だけを Git の管理対象から除外してください。チームや別PCへ配布する場合はコピー導入を選べます。既存の技能や設定を巻き込んで `.agents/`・`.claude/` 全体を削除しないでください。
+
+構造化記録を開始すると、その worktree のルートへ `.moletta-runs/<作業単位ID>/` を作り、`.moletta-runs/README.md` に内容と保持方法を説明します。記録を使うプロジェクトでは、次を `.gitignore` に追加してください。installer と runtime は除外設定を自動編集しません。Git の外では選択したプロジェクトのディレクトリを使い、明示した場所への保存も選べます。
+
+```gitignore
+/.moletta-runs/
+```
+
+### リンクとコピーの更新
+
+本体を編集していない専用 checkout で、作業の区切りに `main` を更新します。
+
+```sh
+git -C /absolute/path/to/moletta switch main &&
+  git -C /absolute/path/to/moletta pull --ff-only origin main
+```
+
+| 配置方法 | 導入先の更新方法 | 元の checkout |
+| --- | --- | --- |
+| リンク（既定） | 本体の更新に追随するため、通常は再導入不要 | 同じ場所に維持する。移動・削除するとリンクが切れる |
+| コピー | 本体を更新した後、導入済みの5技能を確認・退避／除去して、同じ `--host` と `--mode copy` で再導入する | コピー済みの技能の実行には不要。再導入には更新済みの本体を使う |
+
+コピー更新や配置方法の切り替えで取り除くのは、導入したホストの技能一覧にある5項目だけです。他の技能、ホストの設定、`.moletta-runs/` は削除しません。既存項目を残したままのコピー更新は、上書きせず停止します。
+
+両ホストへコピー導入していた場合は、両方の導入先で5項目を確認・退避／除去した後、次を実行します。片方だけなら、初回と同じ `--host` を付けます。
+
+```sh
+python3 /absolute/path/to/moletta/scripts/install.py /absolute/path/to/app-worktree --mode copy
+```
+
+更新後は新しいセッションから使うと、既に読み込んだ指示と更新後の指示が混在するのを避けられます。実開発で挙動を観察する期間は途中で更新せず、使用した版と作業の区切りを残すと変化を追いやすくなります。
+
+### Claude Code の一時利用
 
 Claude Code はセッション専用プラグインとしても利用できます。
 
 ```sh
-claude --plugin-dir /absolute/path/to/moletta
+cd /absolute/path/to/app-worktree &&
+  claude --plugin-dir /absolute/path/to/moletta
 ```
 
-この導入方法の呼び出し名は `/moletta:moletta` です。プロジェクトへの導入と、どちらか一方を使います。
+この導入方法の呼び出し名は `/moletta:moletta` です。プロジェクトへの導入と、どちらか一方を使います。更新した本体を使う場合は、このオプションを付けた新しいセッションを開始してください。
 
 ## 使う
 
@@ -60,7 +114,34 @@ claude --plugin-dir /absolute/path/to/moletta
 
 主担当は、指示・成果・選好・提案・将来像を文脈から理解し、提案をそのまま機能追加へ変換しません。目的への効果と全体の負担を評価し、採用・別の場所で対応・保留・非採用を理由付きで選びます。人の判断が必要なら推奨と選択肢を提示します。丁寧に表現された明確な指示は守り、小変更へ不要な審査を加えません。[発言の解釈と範囲の判断](skills/moletta/references/intent-and-scope.md) に方針があります。
 
-記録を開始すると、現在の Git worktree のルートへ `.moletta-runs/<作業単位ID>/` を作ります。各作業の記録は独立し、`.moletta-runs/README.md` が内容と保持方法を説明します。`/.moletta-runs/` を `.gitignore` に追加するよう案内しますが、設定を黙って変更しません。Git の外では選択したプロジェクトのディレクトリを使います。明示した場所への保存も選べます。
+### 独立レビューを含む実開発の依頼例
+
+重要な採用・完了判断や能力の抜けが疑われる場面では、ホストのサブエージェント機能を使って別文脈のレビューを行います。主担当が利用可否と権限を確認し、起動、資料の受け渡し、指摘の確認と処置を担当します。利用できない場合は自己レビューと明記します。同じ会話の読み直しを独立レビューとは扱いません。詳細は [原文レビューの手順](skills/moletta/references/delegation.md) を参照してください。
+
+以下はモバイル開発の例です。目的と必須条件を案件に合わせて置き換え、Claude Code のプロジェクト導入では先頭を `/moletta`、プラグイン利用では `/moletta:moletta` に変更します。
+
+```text
+$moletta
+
+この作業を、調査・設計・実装・検証まで進めてください。
+
+目的：
+iOS / Androidアプリでプロフィール名を変更でき、アプリ再起動後も変更結果を確認できるようにしたいです。
+
+必須条件：
+- 既存の認証・API契約を維持する。
+- Simulator / emulatorで、画面への到達・入力・保存・再起動後の確認まで、人が端末を操作せず検証する。
+- 機密情報や社内情報の読み取り・保存・モデルへの入力は、案件の許可範囲に限定する。
+
+進め方：
+- 現状を調べ、開始から目的達成までに必要な能力と未確認の前提を確認してください。必要なら、異なる実現方法も一次資料で調べて比較してください。
+- 重要な設計・完了判断では、同じホストの承認済み設定で独立レビューを使ってください。最初に原依頼と必要最小限の資料だけを渡し、必要能力を再構成した後に、案・成果物・証拠を渡して照合してください。
+- 指摘は主担当が確認し、修正・反証・保留の理由を示してください。独立実行できない場合は自己レビューと明記してください。
+- 小変更へ一律の追加レビューや評価専用の工程を加えず、記録は既存の報告を優先してください。
+- 完了報告には、確認した成果、証拠への参照、レビュー方式、重要な指摘への処置、未確認事項を簡潔に残してください。時間・tokenは取得できる範囲だけ記載してください。
+```
+
+Moletta 自体は案件の画面操作ツールやモデルの起動機構を提供しません。必要な能力を利用できない場合は、未確認のまま成功にせず、不足と次の確認を示します。狭く明確な小変更は短く進め、レビューや記録の数を目的にしません。
 
 ## モバイル開発と担当の選択
 
